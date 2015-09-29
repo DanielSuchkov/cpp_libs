@@ -17,7 +17,9 @@ If you have somewhere in code
     };
     
 and want to use it as `std::function<void ()>`, just write
+
     auto fn = carry(&Foo::foo, foo_ptr);
+
 unlike `std::bind` you don't need to specify all `Foo::foo` arguments.
 Note that you can carry as much args as you want.
 
