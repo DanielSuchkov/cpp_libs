@@ -4,6 +4,16 @@
 #include <type_traits>
 
 
+template<int>
+struct placeholder_template {};
+
+namespace std {
+    template<int N>
+    struct is_placeholder< placeholder_template<N> >
+        : integral_constant<int, N+1>
+    {};
+}
+
 namespace fcl {
     namespace details {
         template<int...> struct int_sequence {};
@@ -13,16 +23,6 @@ namespace fcl {
 
         template<int... Is> struct make_int_sequence<0, Is...>
             : int_sequence<Is...> {};
-
-        template<int>
-        struct placeholder_template {};
-
-        namespace std {
-            template<int N>
-            struct is_placeholder< placeholder_template<N> >
-                : integral_constant<int, N+1>
-            {};
-        }
 
         template<typename T>
         struct memfun_type {
