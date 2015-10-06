@@ -166,7 +166,7 @@ private:
 };
 
 template <typename T, typename Source>
-T readVal(Source &stream)
+T read_val(Source &stream)
 {
     T outVal;
     stream >> outVal;

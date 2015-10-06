@@ -49,7 +49,8 @@ auto FFL(F const &func)
 
 // Do not use this!
 template<typename Fn, typename ...Some, int ...Is>
-auto carry_(const Fn &fn, int_sequence<Is...>, Some &&...arg) {
+auto carry_(const Fn &fn, int_sequence<Is...>, Some &&...arg)
+    -> decltype(std::bind(fn, std::forward<Some>(arg)..., placeholder_template<Is>{}...)) {
     return std::bind(fn, std::forward<Some>(arg)..., placeholder_template<Is>{}...);
 }
 
