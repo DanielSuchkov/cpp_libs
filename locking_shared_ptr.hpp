@@ -5,7 +5,28 @@
 
 namespace fcl {
     template <typename Ty>
+    class locking_shared_ptr;
+
+    template <typename Ty>
+    struct use_same_lock_policy {
+        locking_shared_ptr<Ty> &m_other;
+        use_same_lock_policy(locking_shared_ptr<Ty> &other)
+            : m_other(other) {}
+    };
+
+    template <typename Ty>
+    auto use_same_lock(locking_shared_ptr<Ty> &other)
+        -> use_same_lock_policy<Ty> {
+        return use_same_lock_policy<Ty>(other);
+    }
+
+    struct use_own_lock_policy {};
+
+    template <typename Ty>
     class locking_shared_ptr {
+        template <typename OtherTy>
+        friend class locking_shared_ptr;
+
     public:
         using ptr_t = std::shared_ptr<Ty>;
         using mutex_t = std::recursive_mutex;
@@ -52,29 +73,55 @@ namespace fcl {
         };
 
     public:
-        locking_shared_ptr(Ty *ptr)
-            : m_ptr(ptr) {}
+        template <typename MutexPolicy = use_own_lock_policy>
+        locking_shared_ptr(Ty *ptr, MutexPolicy policy = MutexPolicy())
+            : m_ptr(ptr)
+            , m_mutex(make_mutex(policy)) {}
 
-        locking_shared_ptr(ptr_t ptr)
-            : m_ptr(ptr) {}
+        template <typename MutexPolicy = use_own_lock_policy>
+        locking_shared_ptr(ptr_t ptr, MutexPolicy policy = MutexPolicy())
+            : m_ptr(ptr)
+            , m_mutex(make_mutex(policy)) {}
 
-        locking_shared_ptr(Ty &&data)
-            : m_ptr(std::make_shared<Ty>(std::move(data))) {}
+        template <typename MutexPolicy = use_own_lock_policy>
+        locking_shared_ptr(Ty &&data, MutexPolicy policy = MutexPolicy())
+            : m_ptr(std::make_shared<Ty>(std::move(data)))
+            , m_mutex(make_mutex(policy)) {}
 
-        locking_shared_ptr(const Ty &data)
-            : m_ptr(std::make_shared<Ty>(data)) {}
+        template <typename MutexPolicy = use_own_lock_policy>
+        locking_shared_ptr(const Ty &data, MutexPolicy policy = MutexPolicy())
+            : m_ptr(std::make_shared<Ty>(data))
+            , m_mutex(make_mutex(policy)) {}
 
-        template <typename ...Args>
-        locking_shared_ptr(Args &&...args)
-            : m_ptr(std::make_shared<Ty>(std::forward(args)...)) {}
+        template <typename ...Args, typename MutexPolicy = use_own_lock_policy>
+        locking_shared_ptr(Args &&...args, MutexPolicy policy = MutexPolicy())
+            : m_ptr(std::make_shared<Ty>(std::forward(args)...))
+            , m_mutex(make_mutex(policy)) {}
+
+        locking_shared_ptr(const locking_shared_ptr &) = default;
+        locking_shared_ptr &operator =(const locking_shared_ptr &) = default;
+
+        locking_shared_ptr(locking_shared_ptr &&) = default;
+        locking_shared_ptr &operator =(locking_shared_ptr &&) = default;
 
         locked_ptr lock() {
             return { *m_mutex, m_ptr };
         }
 
     private:
+        template<typename OtherTy>
+        static auto make_mutex(use_same_lock_policy<OtherTy> &other)
+            -> std::shared_ptr<mutex_t> {
+            return other.m_other.m_mutex;
+        }
+
+        static auto make_mutex(use_own_lock_policy)
+            -> std::shared_ptr<mutex_t> {
+            return std::make_shared<mutex_t>();
+        }
+
         ptr_t m_ptr;
-        std::shared_ptr<mutex_t> m_mutex = std::make_shared<mutex_t>();
+        std::shared_ptr<mutex_t> m_mutex;
     };
 
 
