@@ -7,6 +7,8 @@ namespace fcl {
     template <typename Ty>
     class locking_shared_ptr;
 
+    struct use_own_lock_policy {};
+
     template <typename Ty>
     struct use_same_lock_policy {
         locking_shared_ptr<Ty> &m_other;
@@ -19,8 +21,6 @@ namespace fcl {
         -> use_same_lock_policy<Ty> {
         return use_same_lock_policy<Ty>(other);
     }
-
-    struct use_own_lock_policy {};
 
     template <typename Ty>
     class locking_shared_ptr {
