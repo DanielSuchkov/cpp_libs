@@ -15,15 +15,15 @@ public:
         lock_guard(const lock_guard &) = delete;
         lock_guard &operator =(const lock_guard &) = delete;
 
-        lock_guard(lock_guard &&) = delete;
-        lock_guard &operator =(lock_guard &&) = delete;
+        lock_guard(lock_guard &&) = default;
+        lock_guard &operator =(lock_guard &&) = default;
 
         Ty *operator->() {
-            return m_ptr.get();
+            return &m_data;
         }
 
         const Ty *operator->() const {
-            return m_ptr.get();
+            return &m_data;
         }
 
         Ty &operator*() {
@@ -36,15 +36,15 @@ public:
 
         ///\note You can use it wrong. At your own risk of course.
         Ty *get() const {
-            return m_ptr.get();
+            return &m_data;
         }
 
         Ty &ref() {
-            return *m_ptr;
+            return m_data;
         }
 
         const Ty &ref() const {
-            return *m_ptr;
+            return m_data;
         }
 
     private:
@@ -53,7 +53,7 @@ public:
             , m_data(data) {}
 
     private:
-        std::lock_guard<mutex_t> m_lock;
+        std::unique_lock<mutex_t> m_lock;
         Ty &m_data;
     };
 
@@ -66,11 +66,11 @@ public:
     mutex_guard(const Ty &data)
         : m_data(data) {}
 
-    mutex_guard(const mutex_guard) = delete;
+    mutex_guard(const mutex_guard &) = delete;
     mutex_guard &operator=(const mutex_guard &) = delete;
 
-    lock_guard lock() const {
-        return { *m_mutex, m_data };
+    lock_guard lock() {
+        return { m_mutex, m_data };
     }
 
 private:
