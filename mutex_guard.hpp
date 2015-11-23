@@ -58,6 +58,8 @@ public:
     };
 
 public:
+    mutex_guard() = default;
+
     mutex_guard(Ty &&data)
         : m_data(data) {}
 
