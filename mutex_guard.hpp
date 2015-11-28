@@ -73,6 +73,18 @@ public:
         return { m_mutex, m_data };
     }
 
+    Ty &unsafe_ref() {
+        return m_data;
+    }
+
+    const Ty &unsafe_ref() const {
+        return m_data;
+    }
+
+    Ty *unsafe_ptr() const {
+        return &m_data;
+    }
+
 private:
     Ty m_data;
     mutex_t m_mutex;
