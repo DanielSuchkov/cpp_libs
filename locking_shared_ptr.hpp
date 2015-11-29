@@ -11,7 +11,7 @@ namespace fcl {
 
     template <typename Ty>
     struct use_same_lock_policy {
-        locking_shared_ptr<Ty> &m_other;
+        const locking_shared_ptr<Ty> &m_other;
         use_same_lock_policy(locking_shared_ptr<Ty> &other)
             : m_other(other) {}
     };
@@ -73,6 +73,9 @@ namespace fcl {
         };
 
     public:
+        locking_shared_ptr()
+            : m_mutex(make_mutex(use_own_lock_policy())) {}
+
         template <typename MutexPolicy = use_own_lock_policy>
         locking_shared_ptr(Ty *ptr, MutexPolicy policy = MutexPolicy())
             : m_ptr(ptr)
@@ -95,7 +98,7 @@ namespace fcl {
 
         template <typename ...Args, typename MutexPolicy = use_own_lock_policy>
         locking_shared_ptr(Args &&...args, MutexPolicy policy = MutexPolicy())
-            : m_ptr(std::make_shared<Ty>(std::forward(args)...))
+            : m_ptr(std::make_shared<Ty>(std::forward<Args>(args)...))
             , m_mutex(make_mutex(policy)) {}
 
         locking_shared_ptr(const locking_shared_ptr &) = default;
@@ -104,8 +107,20 @@ namespace fcl {
         locking_shared_ptr(locking_shared_ptr &&) = default;
         locking_shared_ptr &operator =(locking_shared_ptr &&) = default;
 
-        locked_ptr lock() {
+        locked_ptr lock() const {
             return { *m_mutex, m_ptr };
+        }
+
+        const Ty &unsafe_ref() const {
+            return *m_ptr;
+        }
+
+        Ty &unsafe_ref() {
+            return *m_ptr;
+        }
+
+        Ty *unsafe_ptr() const {
+            return m_ptr.get();
         }
 
     private:
@@ -127,6 +142,6 @@ namespace fcl {
 
     template <typename Ty, typename ...Args>
     auto make_locking_shared(Args &&...args) -> locking_shared_ptr<Ty> {
-        return locking_shared_ptr<Ty>(std::forward(args)...);
+        return locking_shared_ptr<Ty>(std::forward<Args>(args)...);
     }
 } // namespace fcl
