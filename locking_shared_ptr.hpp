@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <mutex>
+#include <boost/optional.hpp>
 
 
 namespace fcl {
@@ -26,6 +27,8 @@ namespace fcl {
     class locking_shared_ptr {
         template <typename OtherTy>
         friend class locking_shared_ptr;
+
+        struct try_to_lock {};
 
     public:
         using ptr_t = std::shared_ptr<Ty>;
@@ -61,17 +64,25 @@ namespace fcl {
             Ty *get() const {
                 return m_ptr.get();
             }
-
         private:
             locked_ptr(mutex_t &mutex, ptr_t ptr)
                 : m_lock(mutex)
                 , m_ptr(ptr) {}
+
+            locked_ptr(mutex_t &mutex, ptr_t ptr, try_to_lock)
+                : m_lock(mutex, std::try_to_lock)
+                , m_ptr(locked() ? ptr : nullptr) {}
+
+            bool locked() const {
+                return m_lock.owns_lock();
+            }
 
         private:
             std::unique_lock<mutex_t> m_lock;
             ptr_t m_ptr;
         };
 
+        using opt_locked_ptr = boost::optional<locked_ptr>;
     public:
         locking_shared_ptr()
             : m_mutex(make_mutex(use_own_lock_policy())) {}
@@ -109,6 +120,15 @@ namespace fcl {
 
         locked_ptr lock() const {
             return { *m_mutex, m_ptr };
+        }
+
+        opt_locked_ptr try_lock() const {
+            locked_ptr ptr(*m_mutex, m_ptr, try_to_lock());
+            if (!ptr.locked()) {
+                return boost::none;
+            }
+
+            return opt_locked_ptr(std::move(ptr));
         }
 
         const Ty &unsafe_ref() const {
