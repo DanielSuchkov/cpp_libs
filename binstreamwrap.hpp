@@ -268,14 +268,3 @@ public:
 private:
     std::ostream &m_ostr;
 };
-
-class BinIOStreamWrap
-        : public BinIStreamWrap,
-          public BinOStreamWrap
-{
-public:
-    BinIOStreamWrap(std::iostream &iostr, UseExceptions useExceptions = UseExceptions::yes) :
-        BinIStreamWrap(iostr, useExceptions),
-        BinOStreamWrap(iostr)
-    { }
-};
