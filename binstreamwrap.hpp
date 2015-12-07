@@ -31,6 +31,7 @@ public:
 #   undef noexcept
 #endif
 
+template <class StreamTy>
 class BinIStreamWrap
 {
 public:
@@ -45,7 +46,7 @@ public:
      * \param istr Input stream opend with std::ios::binary flag
      * \param useExceptions UseExceptions::yes if you want that this class notify you about reading at eof using exceptions and UseExceptions::no if no
      */
-    explicit BinIStreamWrap(std::istream &istr,
+    explicit BinIStreamWrap(StreamTy &istr,
                             UseExceptions useExceptions = UseExceptions::yes) :
         m_istr(istr),
         m_useExceptions(useExceptions == UseExceptions::yes)
@@ -161,7 +162,7 @@ public:
     }
 
 private:
-    std::istream &m_istr;
+    StreamTy &m_istr;
     bool m_useExceptions;
 };
 
@@ -173,10 +174,16 @@ T read_val(Source &stream)
     return outVal;
 }
 
+template <class StreamTy>
+auto make_bin_istream(StreamTy &stream) {
+    return BinIStreamWrap<StreamTy>(stream);
+}
+
+template <class StreamTy>
 class BinOStreamWrap
 {
 public:
-    explicit BinOStreamWrap(std::ostream &ostr) :
+    explicit BinOStreamWrap(StreamTy &ostr) :
         m_ostr(ostr)
     { }
 
@@ -266,5 +273,27 @@ public:
     }
 
 private:
-    std::ostream &m_ostr;
+    StreamTy &m_ostr;
 };
+
+template <class StreamTy>
+auto make_bin_ostream(StreamTy &stream) {
+    return BinIStreamWrap<StreamTy>(stream);
+}
+
+template <class StreamTy>
+class BinIOStreamWrap
+        : public BinIStreamWrap<StreamTy>,
+          public BinOStreamWrap<StreamTy>
+{
+public:
+    BinIOStreamWrap(StreamTy &iostr, UseExceptions useExceptions = UseExceptions::yes) :
+        BinIStreamWrap(iostr, useExceptions),
+        BinOStreamWrap(iostr)
+    { }
+};
+
+template <class StreamTy>
+auto make_bin_iostream(StreamTy &stream) {
+    return BinIOStreamWrap<StreamTy>(stream);
+}
