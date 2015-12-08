@@ -1,10 +1,12 @@
 #pragma once
 
-template <class StreamTy>
-class BinIStreamWrap;
+namespace fcl {
+    template <class StreamTy>
+    class BinIStreamWrap;
 
-template <class StreamTy>
-class BinOStreamWrap;
+    template <class StreamTy>
+    class BinOStreamWrap;
 
-template <class StreamTy>
-class BinIOStreamWrap;
+    template <class StreamTy>
+    class BinIOStreamWrap;
+}

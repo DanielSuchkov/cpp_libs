@@ -23,8 +23,7 @@ namespace fcl {
 class ReadingAtEOF : public std::exception
 {
 public:
-    virtual const char *what() const noexcept override final
-    {
+    virtual const char *what() const noexcept override final {
         return "attempt to read at eof";
     }
 };
@@ -34,30 +33,28 @@ public:
 #endif
 
 
-enum class UseExceptions
-{
+enum class UseExceptions {
     yes, no
 };
 
 namespace details {
-template <size_t I>
-struct reader {
-    template<class StreamTy, typename... Tp>
-    friend auto read_tuple(BinIStreamWrap<StreamTy> &is, std::tuple<Tp ...> &tpl)
-    {
-        is >> std::get<I>(tpl);
-        reader< sizeof...(Tp) - I - 1 >::read_tuple(is, tpl);
-        return is;
-    }
-};
+    template <size_t I>
+    struct reader {
+        template<class StreamTy, typename... Tp>
+        friend auto read_tuple(BinIStreamWrap<StreamTy> &is, std::tuple<Tp ...> &tpl) {
+            is >> std::get<I>(tpl);
+            reader< sizeof...(Tp) - I - 1 >::read_tuple(is, tpl);
+            return is;
+        }
+    };
 
-template <>
-struct reader<0> {
-    template<class StreamTy, typename... Tp>
-    friend auto read_tuple(BinIStreamWrap<StreamTy> &is, std::tuple<Tp ...> &) {
-        return is;
-    }
-};
+    template <>
+    struct reader<0> {
+        template<class StreamTy, typename... Tp>
+        friend auto read_tuple(BinIStreamWrap<StreamTy> &is, std::tuple<Tp ...> &) {
+            return is;
+        }
+    };
 }
 //namespace from {
 //    struct begin_t {} begin;
@@ -65,8 +62,7 @@ struct reader<0> {
 //}
 
 template <class StreamTy>
-class BinIStreamWrap
-{
+class BinIStreamWrap {
 public:
     /*!
      * \brief BinIStreamWrap
@@ -74,10 +70,9 @@ public:
      * \param useExceptions UseExceptions::yes if you want that this class notify you about reading at eof using exceptions and UseExceptions::no if no
      */
     explicit BinIStreamWrap(StreamTy &istr,
-                            UseExceptions useExceptions = UseExceptions::yes) :
-        m_istr(istr),
-        m_useExceptions(useExceptions == UseExceptions::yes)
-    { }
+                            UseExceptions useExceptions = UseExceptions::yes)
+        : m_istr(istr)
+        , m_useExceptions(useExceptions == UseExceptions::yes) {}
 
     int64_t get_ipos() const {
         return m_istr.tellg();
@@ -96,40 +91,34 @@ public:
     }
 
     template <typename T>
-    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, T &t)
-    {
+    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, T &t) {
         static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
         is.m_istr.read(reinterpret_cast< char *>(&t), sizeof(t));
-        if (is.m_istr.eof() && is.m_useExceptions)
-        {
+        if (is.m_istr.eof() && is.m_useExceptions) {
             throw ReadingAtEOF();
         }
         return is;
     }
 
     template <typename T, typename Alloc>
-    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, std::vector< T, Alloc > &vec)
-    {
+    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, std::vector< T, Alloc > &vec) {
         uint64_t size;
         is >> size;
         vec.resize(static_cast< size_t >(size));
         is.m_istr.read(reinterpret_cast< char *>(vec.data()), static_cast< size_t >(size) * sizeof(T));
-        if (is.m_istr.eof() && is.m_useExceptions)
-        {
+        if (is.m_istr.eof() && is.m_useExceptions) {
             throw ReadingAtEOF();
         }
         return is;
     }
 
     template <typename T, typename Alloc>
-    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, std::list< T, Alloc > &list)
-    {
+    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, std::list< T, Alloc > &list) {
         uint64_t size;
         is >> size;
         list.resize(static_cast< size_t >(size));
 
-        for (auto &el: list)
-        {
+        for (auto &el: list) {
             is >> el;
         }
 
@@ -138,35 +127,33 @@ public:
 
     template <typename CharT, typename Traits, typename Alloc>
     friend BinIStreamWrap &operator >>(
-            BinIStreamWrap                            &is,
-            std::basic_string< CharT, Traits, Alloc > &s
-            )
-    {
+            BinIStreamWrap &is,
+            std::basic_string< CharT, Traits, Alloc > &s) {
         uint64_t size;
         is >> size;
         s.resize(static_cast< size_t >(size));
-        is.m_istr.read(reinterpret_cast< char *>(&s.front()),
-                       sizeof(CharT) * static_cast< size_t >(size)
-                       );
+        is.m_istr.read(
+            reinterpret_cast< char *>(&s.front()),
+            sizeof(CharT) * static_cast< size_t >(size)
+        );
 
-        if (is.m_istr.eof() && is.m_useExceptions)
-        {
+        if (is.m_istr.eof() && is.m_useExceptions) {
             throw ReadingAtEOF();
         }
         return is;
     }
 
 #ifdef QT_VERSION
-    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, QString &str)
-    {
+    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, QString &str) {
         int32_t size;
         is >> size;
         str.resize(static_cast< int >(size));
-        is.m_istr.read(reinterpret_cast< char *>(str.data()),
-                       static_cast< size_t >(size) * sizeof(QChar)
-                       );
-        if (is.m_istr.eof() && is.m_useExceptions)
-        {
+        is.m_istr.read(
+            reinterpret_cast< char *>(str.data()),
+            static_cast< size_t >(size) * sizeof(QChar)
+        );
+
+        if (is.m_istr.eof() && is.m_useExceptions) {
             throw ReadingAtEOF();
         }
         return is;
@@ -174,23 +161,20 @@ public:
 #endif // QT_VERSION
 
     template <typename T>
-    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, std::pair< T *, uint64_t > &cArr)
-    {
+    friend BinIStreamWrap &operator >>(
+            BinIStreamWrap &is,
+            std::pair< T *, uint64_t > &cArr) {
         is >> cArr.second;
         cArr.first = new T[cArr.second];
-        is.m_istr.read(reinterpret_cast< char *>(cArr.first),
-                       sizeof(T) * cArr.second
-                       );
-        if (is.m_istr.eof() && is.m_useExceptions)
-        {
+        is.m_istr.read(reinterpret_cast< char *>(cArr.first), sizeof(T) * cArr.second);
+        if (is.m_istr.eof() && is.m_useExceptions) {
             throw ReadingAtEOF();
         }
         return is;
     }
 
     template<typename... Tp>
-    friend BinIStreamWrap & operator >>(BinIStreamWrap &is, std::tuple<Tp ...> &tpl)
-    {
+    friend BinIStreamWrap & operator >>(BinIStreamWrap &is, std::tuple<Tp ...> &tpl) {
         details::reader<sizeof...(Tp)>::read_tuple(is, tpl);
         return is;
     }
@@ -201,8 +185,7 @@ private:
 };
 
 template <typename T, typename Source>
-T read_val(Source &stream)
-{
+T read_val(Source &stream) {
     T outVal;
     stream >> outVal;
     return outVal;
@@ -214,34 +197,31 @@ auto make_bin_istream(StreamTy &stream) {
 }
 
 namespace details {
-template <size_t I>
-struct writer {
-    template<class StreamTy, typename... Tp>
-    auto write_tuple(BinOStreamWrap<StreamTy> &os, const std::tuple< Tp ...> &tpl)
-    {
-        os << std::get<I>(tpl);
-        writer<sizeof...(Tp) - (I + 1)>::write_tuple(os, tpl);
-        return os;
-    }
-};
+    template <size_t I>
+    struct writer {
+        template<class StreamTy, typename... Tp>
+        auto write_tuple(BinOStreamWrap<StreamTy> &os, const std::tuple< Tp ...> &tpl) {
+            os << std::get<I>(tpl);
+            writer<sizeof...(Tp) - (I + 1)>::write_tuple(os, tpl);
+            return os;
+        }
+    };
 
-template <>
-struct writer<0> {
-    template<class StreamTy, typename... Tp>
-    auto write_tuple(BinOStreamWrap<StreamTy> &os, const std::tuple< Tp ...> &)
-    {
-        return os;
-    }
-};
+    template <>
+    struct writer<0> {
+        template<class StreamTy, typename... Tp>
+        auto write_tuple(BinOStreamWrap<StreamTy> &os, const std::tuple< Tp ...> &) {
+            return os;
+        }
+    };
 }
 
 template <class StreamTy>
 class BinOStreamWrap
 {
 public:
-    explicit BinOStreamWrap(StreamTy &ostr) :
-        m_ostr(ostr)
-    { }
+    explicit BinOStreamWrap(StreamTy &ostr)
+        : m_ostr(ostr) {}
 
     int64_t get_opos() const {
         return m_ostr.tellp();
@@ -260,8 +240,7 @@ public:
     }
 
     template <typename T>
-    friend BinOStreamWrap &operator <<(BinOStreamWrap &os, const T &t)
-    {
+    friend BinOStreamWrap &operator <<(BinOStreamWrap &os, const T &t) {
         static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
         os.m_ostr.write(reinterpret_cast< const char *>(&t), sizeof(t));
         return os;
@@ -269,8 +248,7 @@ public:
 
     template <typename T, typename Alloc>
     friend BinOStreamWrap &operator <<(      BinOStreamWrap         &os,
-                                             const std::vector< T, Alloc > &vec)
-    {
+                                       const std::vector< T, Alloc > &vec) {
         const auto size = static_cast< uint64_t >(vec.size());
         os << size;
         os.m_ostr.write(reinterpret_cast< const char *>(vec.data()),
@@ -280,13 +258,12 @@ public:
     }
 
     template <typename T, typename Alloc>
-    friend BinOStreamWrap &operator <<(      BinOStreamWrap       &os,
-                                             const std::list< T, Alloc > &list)
-    {
+    friend BinOStreamWrap &operator <<(
+            BinOStreamWrap &os,
+            const std::list< T, Alloc > &list) {
         const auto size = static_cast< uint64_t >(list.size());
         os << size;
-        for (auto &el: list)
-        {
+        for (auto &el: list) {
             os << el;
         }
 
@@ -295,10 +272,8 @@ public:
 
     template <typename CharT, typename Traits, typename Alloc>
     friend BinOStreamWrap &operator <<(
-            BinOStreamWrap                            &os,
-            const std::basic_string< CharT, Traits, Alloc > &s
-            )
-    {
+            BinOStreamWrap &os,
+            const std::basic_string< CharT, Traits, Alloc > &s) {
         const auto size = static_cast< uint64_t >(s.size());
         os << size;
         os.m_ostr.write(s.data(), sizeof(CharT) * static_cast< size_t >(size));
@@ -306,32 +281,31 @@ public:
     }
 
 #ifdef QT_VERSION
-    friend BinOStreamWrap &operator <<(BinOStreamWrap &os, const QString &str)
-    {
+    friend BinOStreamWrap &operator <<(BinOStreamWrap &os, const QString &str) {
         int32_t size = str.size();
         os << size;
-        os.m_ostr.write(reinterpret_cast< const char *>(str.data()),
-                        static_cast< size_t >(size) * sizeof(QChar)
-                        );
+        os.m_ostr.write(
+            reinterpret_cast< const char *>(str.data()),
+            static_cast< size_t >(size) * sizeof(QChar)
+        );
         return os;
     }
 #endif // QT_VERSION
 
     template <typename T>
     friend BinOStreamWrap &operator <<(      BinOStreamWrap          &os,
-                                             const std::pair< T *, uint64_t > &cArr)
-    {
+                                       const std::pair< T *, uint64_t > &cArr) {
         os << cArr.second;
-        os.m_ostr.write(reinterpret_cast< const char *>(cArr.first),
-                        sizeof(T) * cArr.second
-                        );
+        os.m_ostr.write(
+            reinterpret_cast< const char *>(cArr.first),
+            sizeof(T) * cArr.second
+        );
         return os;
     }
 
     template <std::size_t I = 0, typename... Tp>
     friend auto operator <<(BinOStreamWrap &os, const std::tuple< Tp ...> &tpl)
-    -> typename std::enable_if< I < sizeof...(Tp), BinOStreamWrap & >::type
-    {
+        -> typename std::enable_if< I < sizeof...(Tp), BinOStreamWrap & >::type {
         os << std::get<I>(tpl);
         details::writer<sizeof...(Tp)>::write_tuple(os, tpl);
         return os;
@@ -339,8 +313,7 @@ public:
 
     template <std::size_t I = 0, typename... Tp>
     friend auto operator <<(BinOStreamWrap &os, const std::tuple< Tp ...> &)
-    -> typename std::enable_if< I == sizeof...(Tp), BinOStreamWrap & >::type
-    {
+        -> typename std::enable_if< I == sizeof...(Tp), BinOStreamWrap & >::type {
         return os;
     }
 
@@ -355,21 +328,20 @@ auto make_bin_ostream(StreamTy &stream) {
 
 template <class StreamTy>
 class BinIOStreamWrap
-        : public BinIStreamWrap<StreamTy>,
-        public BinOStreamWrap<StreamTy>
+        : public BinIStreamWrap<StreamTy>
+        , public BinOStreamWrap<StreamTy>
 {
 public:
-    BinIOStreamWrap(StreamTy &iostr, UseExceptions useExceptions = UseExceptions::yes) :
-        BinIStreamWrap<StreamTy>(iostr, useExceptions),
-        BinOStreamWrap<StreamTy>(iostr)
-    { }
+    BinIOStreamWrap(StreamTy &iostr, UseExceptions useExceptions = UseExceptions::yes)
+        : BinIStreamWrap<StreamTy>(iostr, useExceptions)
+        , BinOStreamWrap<StreamTy>(iostr) {}
 
     void set_pos(int64_t pos) {
-        set_ipos(pos); // just 'cause
+        this->set_ipos(pos); // just 'cause
     }
 
     int64_t get_pos() const {
-        return get_opos(); // to be fair
+        return this->get_opos(); // to be fair
     }
 };
 
