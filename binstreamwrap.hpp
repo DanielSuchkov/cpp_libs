@@ -13,6 +13,7 @@
 #   include <QString>
 #endif // QT_VERSION
 
+namespace fcl {
 #ifdef _MSC_VER
 #   define noexcept
 #endif
@@ -31,15 +32,15 @@ public:
 #   undef noexcept
 #endif
 
+
+enum class UseExceptions
+{
+    yes, no
+};
+
 template <class StreamTy>
 class BinIStreamWrap
 {
-public:
-    enum class UseExceptions
-    {
-        yes, no
-    };
-
 public:
     /*!
      * \brief BinIStreamWrap
@@ -297,3 +298,5 @@ template <class StreamTy>
 auto make_bin_iostream(StreamTy &stream) {
     return BinIOStreamWrap<StreamTy>(stream);
 }
+
+} // namespace fcl
