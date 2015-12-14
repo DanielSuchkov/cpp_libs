@@ -20,8 +20,7 @@ namespace fcl {
 #endif
 
 
-class ReadingAtEOF : public std::exception
-{
+class ReadingAtEOF : public std::exception {
 public:
     virtual const char *what() const noexcept override final {
         return "attempt to read at eof";
@@ -44,7 +43,7 @@ namespace details {
         static auto read_tuple(BinIStreamWrap<StreamTy> &is, Type &tpl)
             -> BinIStreamWrap<StreamTy> & {
             is >> std::get<N>(tpl);
-            Reader< Type, N + 1, Last >::read_tuple(is, tpl);
+            Reader<Type, N + 1, Last>::read_tuple(is, tpl);
             return is;
         }
     };
@@ -63,6 +62,13 @@ namespace details {
 //    struct end_t {} end;
 //}
 
+template <typename T, typename Source>
+T read_val(Source &stream) {
+    T outVal;
+    stream >> outVal;
+    return outVal;
+}
+
 template <class StreamTy>
 class BinIStreamWrap {
 public:
@@ -77,6 +83,14 @@ public:
             UseExceptions useExceptions = UseExceptions::yes)
         : m_istr(istr)
         , m_useExceptions(useExceptions == UseExceptions::yes) {}
+
+    BinIStreamWrap(const BinIStreamWrap &) = delete;
+    BinIStreamWrap &operator =(const BinIStreamWrap &) = delete;
+
+    BinIStreamWrap(BinIStreamWrap &&) = default;
+    BinIStreamWrap &operator =(BinIStreamWrap &&) = default;
+
+    ~BinIStreamWrap() = default;
 
     int64_t get_ipos() const {
         return m_istr.tellg();
@@ -94,6 +108,32 @@ public:
         m_istr.seekg(0, m_istr.beg);
     }
 
+    void iskip(size_t offset) {
+        set_ipos(get_ipos() + offset);
+    }
+
+    template <typename Ty>
+    void iskip() {
+        iskip(sizeof(Ty));
+    }
+
+    template <typename Ty, typename ...Rest>
+    auto iskip_n() -> typename std::enable_if<sizeof...(Rest) != 0, void>::type {
+        iskip<Ty>();
+        iskip_n<Rest...>();
+    }
+
+    template<typename Ty>
+    void iskip_n() {
+        iskip<Ty>();
+    }
+
+    template <typename Ty>
+    Ty read_at(int64_t pos) {
+        set_ipos(pos);
+        return read_val<Ty>(*this);
+    }
+
     template <typename T>
     friend BinIStreamWrap &operator >>(BinIStreamWrap &is, T &t) {
         static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
@@ -104,12 +144,45 @@ public:
         return is;
     }
 
+    template <typename T, uint64_t I>
+    friend auto operator >>(BinIStreamWrap &is, T (&t)[I])
+        -> typename std::enable_if<
+            std::is_trivially_copyable<T>::value,
+            BinIStreamWrap &>::type {
+        is.m_istr.read(reinterpret_cast<char *>(t), sizeof(T) * I);
+        if (is.m_istr.eof() && is.m_useExceptions) {
+            throw ReadingAtEOF();
+        }
+        return is;
+    }
+
+    template <typename T, uint64_t I>
+    friend auto operator >>(BinIStreamWrap &is, T (&t)[I])
+        -> typename std::enable_if<
+            !std::is_trivially_copyable<T>::value,
+            BinIStreamWrap &>::type {
+        for (auto &el : t) {
+            is >> el;
+            if (is.m_istr.eof() && is.m_useExceptions) {
+                throw ReadingAtEOF();
+            }
+        }
+        return is;
+    }
+
     template <typename T, typename Alloc>
-    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, std::vector< T, Alloc > &vec) {
+    friend auto operator >>(BinIStreamWrap &is, std::vector<T, Alloc> &vec)
+        -> typename std::enable_if<
+            std::is_trivially_copyable<T>::value,
+            BinIStreamWrap &>::type {
         uint64_t size;
         is >> size;
         vec.resize(static_cast<size_t>(size));
-        is.m_istr.read(reinterpret_cast<char *>(vec.data()), static_cast<size_t>(size) * sizeof(T));
+        is.m_istr.read(
+            reinterpret_cast<char *>(vec.data()),
+            static_cast<size_t>(size) * sizeof(T)
+        );
+
         if (is.m_istr.eof() && is.m_useExceptions) {
             throw ReadingAtEOF();
         }
@@ -117,13 +190,34 @@ public:
     }
 
     template <typename T, typename Alloc>
-    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, std::list< T, Alloc > &list) {
+    friend auto operator >>(BinIStreamWrap &is, std::vector<T, Alloc> &vec)
+        -> typename std::enable_if<
+            !std::is_trivially_copyable<T>::value,
+            BinIStreamWrap &>::type {
+        uint64_t size;
+        is >> size;
+        vec.resize(static_cast<size_t>(size));
+
+        for (auto &el : vec) {
+            is >> el;
+            if (is.m_istr.eof() && is.m_useExceptions) {
+                throw ReadingAtEOF();
+            }
+        }
+        return is;
+    }
+
+    template <typename T, typename Alloc>
+    friend BinIStreamWrap &operator >>(BinIStreamWrap &is, std::list<T, Alloc> &list) {
         uint64_t size;
         is >> size;
         list.resize(static_cast<size_t>(size));
 
         for (auto &el: list) {
             is >> el;
+        }
+        if (is.m_istr.eof() && is.m_useExceptions) {
+            throw ReadingAtEOF();
         }
 
         return is;
@@ -132,7 +226,7 @@ public:
     template <typename CharT, typename Traits, typename Alloc>
     friend BinIStreamWrap &operator >>(
             BinIStreamWrap &is,
-            std::basic_string< CharT, Traits, Alloc > &s) {
+            std::basic_string< CharT, Traits, Alloc> &s) {
         uint64_t size;
         is >> size;
         s.resize(static_cast<size_t>(size));
@@ -148,6 +242,7 @@ public:
     }
 
 #ifdef QT_VERSION
+
     friend BinIStreamWrap &operator >>(BinIStreamWrap &is, QString &str) {
         int32_t size;
         is >> size;
@@ -167,7 +262,7 @@ public:
     template <typename T>
     friend BinIStreamWrap &operator >>(
             BinIStreamWrap &is,
-            std::pair< T *, uint64_t > &cArr) {
+            std::pair<T *, uint64_t > &cArr) {
         is >> cArr.second;
         cArr.first = new T[cArr.second];
         is.m_istr.read(reinterpret_cast<char *>(cArr.first), sizeof(T) * cArr.second);
@@ -187,13 +282,6 @@ private:
     StreamTy &m_istr;
     bool m_useExceptions;
 };
-
-template <typename T, typename Source>
-T read_val(Source &stream) {
-    T outVal;
-    stream >> outVal;
-    return outVal;
-}
 
 template <class StreamTy>
 auto make_bin_istream(StreamTy &stream) {
@@ -229,6 +317,14 @@ public:
     explicit BinOStreamWrap(StreamTy &ostr)
         : m_ostr(ostr) {}
 
+    BinOStreamWrap(const BinOStreamWrap &) = delete;
+    BinOStreamWrap &operator =(const BinOStreamWrap &) = delete;
+
+    BinOStreamWrap(BinOStreamWrap &&) = default;
+    BinOStreamWrap &operator =(BinOStreamWrap &&) = default;
+
+    ~BinOStreamWrap() = default;
+
     int64_t get_opos() const {
         return m_ostr.tellp();
     }
@@ -245,6 +341,47 @@ public:
         m_ostr.seekp(0, m_ostr.beg);
     }
 
+    void oskip(size_t offset) {
+        set_opos(get_opos() + offset);
+    }
+
+    template<typename Ty>
+    void oskip() {
+        oskip(sizeof(Ty));
+    }
+
+    template <typename Ty, typename ...Rest>
+    auto oskip_n() -> typename std::enable_if<sizeof...(Rest) != 0, void>::type {
+        oskip<Ty>();
+        oskip_n<Rest...>();
+    }
+
+    template<typename Ty>
+    void oskip_n() {
+        oskip<Ty>();
+    }
+
+    template <typename Ty>
+    int64_t write(const Ty &val) {
+        auto pos = get_opos();
+        (*this) << val;
+        return pos;
+    }
+
+    template <typename Ty>
+    void write_at(int64_t pos, const Ty &val) {
+        set_opos(pos);
+        (*this) << val;
+    }
+
+    template <typename Ty>
+    int64_t append(const Ty &var) {
+        goto_oend();
+        auto pos = get_opos();
+        (*this) << var;
+        return pos;
+    }
+
     template <typename T>
     friend BinOStreamWrap &operator <<(BinOStreamWrap &os, const T &t) {
         static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
@@ -252,10 +389,29 @@ public:
         return os;
     }
 
+    template <typename T, uint64_t I>
+    friend auto operator <<(BinOStreamWrap &os, const T (&array)[I])
+        -> typename std::enable_if<
+            std::is_trivially_copyable<T>::value,
+            BinOStreamWrap &>::type {
+        os.m_ostr.write(reinterpret_cast<const char *>(array), sizeof(T) * I);
+        return os;
+    }
+
+    template <typename T, uint64_t I>
+    friend auto operator <<(BinOStreamWrap &os, const T (&array)[I])
+        -> typename std::enable_if<
+        !std::is_trivially_copyable<T>::value, BinOStreamWrap &>::type {
+        for (auto &el : array) {
+            os << el;
+        }
+        return os;
+    }
+
     template <typename T, typename Alloc>
     friend BinOStreamWrap &operator <<(
             BinOStreamWrap &os,
-            const std::vector< T, Alloc > &vec) {
+            const std::vector<T, Alloc> &vec) {
         const auto size = static_cast<uint64_t>(vec.size());
         os << size;
         os.m_ostr.write(
@@ -268,7 +424,7 @@ public:
     template <typename T, typename Alloc>
     friend BinOStreamWrap &operator <<(
             BinOStreamWrap &os,
-            const std::list< T, Alloc > &list) {
+            const std::list<T, Alloc> &list) {
         const auto size = static_cast<uint64_t>(list.size());
         os << size;
         for (auto &el: list) {
@@ -281,7 +437,7 @@ public:
     template <typename CharT, typename Traits, typename Alloc>
     friend BinOStreamWrap &operator <<(
             BinOStreamWrap &os,
-            const std::basic_string< CharT, Traits, Alloc > &s) {
+            const std::basic_string< CharT, Traits, Alloc> &s) {
         const auto size = static_cast<uint64_t>(s.size());
         os << size;
         os.m_ostr.write(s.data(), sizeof(CharT) * static_cast<size_t>(size));
@@ -313,7 +469,9 @@ public:
     }
 
     template <typename... Tp>
-    friend BinOStreamWrap &operator <<(BinOStreamWrap &os, const std::tuple< Tp ...> &tpl) {
+    friend BinOStreamWrap &operator <<(
+            BinOStreamWrap &os,
+            const std::tuple<Tp ...> &tpl) {
         details::Writer<std::tuple<Tp...>, 0, sizeof...(Tp) - 1>::write_tuple(os, tpl);
         return os;
     }
@@ -333,9 +491,19 @@ class BinIOStreamWrap
         , public BinOStreamWrap<StreamTy>
 {
 public:
-    BinIOStreamWrap(StreamTy &iostr, UseExceptions useExceptions = UseExceptions::yes)
+    BinIOStreamWrap(
+            StreamTy &iostr,
+            UseExceptions useExceptions = UseExceptions::yes)
         : BinIStreamWrap<StreamTy>(iostr, useExceptions)
         , BinOStreamWrap<StreamTy>(iostr) {}
+
+    BinIOStreamWrap(const BinIOStreamWrap &) = delete;
+    BinIOStreamWrap &operator =(const BinIOStreamWrap &) = delete;
+
+    BinIOStreamWrap(BinIOStreamWrap &&) = default;
+    BinIOStreamWrap &operator =(BinIOStreamWrap &&) = default;
+
+    ~BinIOStreamWrap() = default;
 
     void set_pos(int64_t pos) {
         this->set_ipos(pos); // just 'cause
@@ -351,6 +519,26 @@ public:
 
     void goto_end() {
         this->goto_oend();
+    }
+
+    void skip(size_t offset) {
+        set_pos(get_pos() + offset);
+    }
+
+    template <typename Ty>
+    void skip() {
+        skip(sizeof(Ty));
+    }
+
+    template <typename Ty, typename ...Rest>
+    auto skip_n() -> typename std::enable_if<sizeof...(Rest) != 0, void>::type {
+        skip<Ty>();
+        skip_n<Rest...>();
+    }
+
+    template<typename Ty>
+    void skip_n() {
+        skip<Ty>();
     }
 };
 
