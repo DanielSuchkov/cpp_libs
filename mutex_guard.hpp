@@ -66,6 +66,10 @@ public:
     mutex_guard(const Ty &data)
         : m_data(data) {}
 
+    template <typename ...Args>
+    mutex_guard(Args &&...args)
+        : m_data(std::forward<Args>(args)...) {}
+
     mutex_guard(const mutex_guard &) = delete;
     mutex_guard &operator=(const mutex_guard &) = delete;
 
